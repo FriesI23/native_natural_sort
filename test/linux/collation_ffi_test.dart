@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:native_natural_sort/src/linux/collation_ffi.dart';
 
@@ -88,5 +90,19 @@ void main() {
         ]);
       });
     });
+
+    test('unversioned soname resolves to a usable suffix', () {
+      final (lib, suffix) = rules.tryLoadPath('libicui18n.so')!;
+      expect(lib.providesSymbol('ucol_open$suffix'), isTrue);
+    }, skip: _canOpen('libicui18n.so') ? false : 'libicui18n.so not loadable');
   });
+}
+
+bool _canOpen(String path) {
+  try {
+    DynamicLibrary.open(path);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }

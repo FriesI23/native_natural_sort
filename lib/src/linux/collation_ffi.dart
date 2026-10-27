@@ -280,6 +280,24 @@ final class IcuCollationLinuxRules {
     }
   }
 
+  /// Returns the symbol suffix of the libicui18n file mapped for [lib], or
+  /// "" when unknown. An unversioned soname (which can be found via
+  /// `LD_LIBRARY_PATH`) is a symlink, but `/proc/self/maps` lists the
+  /// resolved `libicui18n.so.<major>.<minor>` file.
+  String loadedVersionSuffix(DynamicLibrary lib) {
+    try {
+      for (final line in File('/proc/self/maps').readAsLinesSync()) {
+        final suffix = extractVersionSuffix(line.split(' ').last);
+        if (suffix.isNotEmpty && lib.providesSymbol('ucol_open$suffix')) {
+          return suffix;
+        }
+      }
+    } on FileSystemException {
+      // No procfs; fall back to the unversioned probe.
+    }
+    return '';
+  }
+
   /// Resolves [path] as a usable ICU library, returning the library and
   /// its symbol suffix, or `null` when [path] cannot be opened or probed.
   (DynamicLibrary, String)? tryLoadPath(String path) {
@@ -289,7 +307,8 @@ final class IcuCollationLinuxRules {
     } catch (_) {
       return null;
     }
-    final preferred = extractVersionSuffix(path);
+    final fromName = extractVersionSuffix(path);
+    final preferred = fromName.isNotEmpty ? fromName : loadedVersionSuffix(lib);
     final suffix = probeVersionSuffix(lib, preferred: preferred);
     if (suffix == null) return null;
     return (lib, suffix);
